@@ -11,7 +11,7 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
-      - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - oauth-network
 
@@ -51,3 +51,7 @@ services:
 networks:
   oauth-network:
     driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

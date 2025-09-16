@@ -33,15 +33,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🚀 Starting blog backend server with Axum and Keycloak auth...");
 
-    // Configure OAuth with Nginx proxy in mind
+    // Configure OAuth with PKCE (no client secret needed for public clients)
     let oauth_config = OAuthConfig::new(
         "blog-client".to_string(),
-        "BUzzw9pHNqFnPqPSwcIn1C9SzpZR5e90".to_string(),
-        "http://10.216.68.222/auth/callback".to_string(), // This will be handled by Nginx
-        "http://10.216.68.222:8080/realms/blog-realm/protocol/openid-connect/auth".to_string(),
-        "http://10.216.68.222:8080/realms/blog-realm/protocol/openid-connect/token".to_string(),
-        "http://10.216.68.222:8080/realms/blog-realm/protocol/openid-connect/userinfo".to_string(),
-        "http://10.216.68.222:8080/realms/blog-realm/protocol/openid-connect/logout".to_string(),
+        "".to_string(), // Empty client secret for PKCE public client
+        "http://localhost/auth/callback".to_string(), // This will be handled by Nginx
+        "http://localhost:8080/realms/blog-realm/protocol/openid-connect/auth".to_string(),
+        "http://localhost:8080/realms/blog-realm/protocol/openid-connect/token".to_string(),
+        "http://localhost:8080/realms/blog-realm/protocol/openid-connect/userinfo".to_string(),
+        "http://localhost:8080/realms/blog-realm/protocol/openid-connect/logout".to_string(),
     )?;
     let oauth_config = Arc::new(oauth_config);
 
@@ -76,9 +76,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             header::HeaderName::from_static("x-auth-token"),
         ])
         .allow_origin([
-            "http://10.216.68.222".parse().unwrap(),
-            "http://10.216.68.222:80".parse().unwrap(),
-            "http://10.216.68.222:8080".parse().unwrap(),
+            "http://localhost".parse().unwrap(),
+            "http://localhost:80".parse().unwrap(),
+            "http://localhost:8080".parse().unwrap(),
             "http://localhost:3000".parse().unwrap(),
         ])
         .allow_credentials(true)
@@ -388,8 +388,12 @@ async fn serve_edit_post(Path(slug): Path<String>) -> Html<String> {
 }
 
 async fn serve_static(Path(file): Path<String>) -> Result<Response, StatusCode> {
-    // Use absolute path to avoid issues with relative paths
-    let file_path = format!("./frontend/static/{}", file);
+    // Use absolute path from project root to avoid issues with relative paths
+    let current_dir = std::env::current_dir()
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let project_root = current_dir.parent()
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let file_path = project_root.join("frontend").join("static").join(&file);
 
     match std::fs::read(&file_path) {
         Ok(content) => {

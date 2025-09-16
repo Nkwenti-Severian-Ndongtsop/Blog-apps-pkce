@@ -81,9 +81,16 @@ impl OAuthConfig {
         userinfo_url: String,
         logout_url: String,
     ) -> Result<Self> {
+        // For PKCE public clients, client_secret should be empty
+        let client_secret_option = if client_secret.is_empty() {
+            None // Public client for PKCE
+        } else {
+            Some(ClientSecret::new(client_secret.clone())) // Confidential client
+        };
+
         let client = BasicClient::new(
             ClientId::new(client_id.clone()),
-            Some(ClientSecret::new(client_secret.clone())),
+            client_secret_option,
             AuthUrl::new(auth_url.clone()).context("Invalid auth URL")?,
             Some(TokenUrl::new(token_url.clone()).context("Invalid token URL")?),
         )
