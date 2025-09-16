@@ -3,17 +3,17 @@ use axum::{
     extract::{Query, State},
     response::{IntoResponse, Redirect},
 };
+use base64::{engine::general_purpose, Engine as _};
+use dashmap::DashMap;
 use oauth2::{
     basic::BasicClient, reqwest::async_http_client, AuthUrl, AuthorizationCode, ClientId,
-    ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, 
+    ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope,
     TokenResponse, TokenUrl,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use dashmap::DashMap;
-use base64::{engine::general_purpose, Engine as _};
-use sha2::{Digest, Sha256};
 use rand::{distributions::Alphanumeric, Rng};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::sync::Arc;
 
 use crate::auth::jwt::{create_jwt, Claims};
 
@@ -113,16 +113,16 @@ impl OAuthConfig {
             .take(128)
             .map(char::from)
             .collect();
-        
+
         let code_verifier = PkceCodeVerifier::new(code_verifier);
         let code_challenge = PkceCodeChallenge::from_code_verifier_sha256(&code_verifier);
-        
+
         (code_verifier, code_challenge)
     }
 
     pub fn authorize(&self) -> (String, String) {
         let (code_verifier, code_challenge) = Self::generate_pkce();
-        
+
         let (auth_url, csrf_token) = self
             .client
             .authorize_url(CsrfToken::new_random)
@@ -134,13 +134,16 @@ impl OAuthConfig {
 
         // Store the code verifier for later use in token exchange
         let state = csrf_token.secret().clone();
-        self.pkce_sessions.insert(state.clone(), code_verifier.secret().clone());
-        
+        self.pkce_sessions
+            .insert(state.clone(), code_verifier.secret().clone());
+
         // Clean up old sessions (simple cleanup - remove sessions older than 10 minutes)
         // In production, you might want a more sophisticated cleanup mechanism
         if self.pkce_sessions.len() > 100 {
             // Remove half of the sessions to prevent memory bloat
-            let keys_to_remove: Vec<String> = self.pkce_sessions.iter()
+            let keys_to_remove: Vec<String> = self
+                .pkce_sessions
+                .iter()
                 .take(50)
                 .map(|entry| entry.key().clone())
                 .collect();
@@ -154,12 +157,14 @@ impl OAuthConfig {
 
     pub async fn exchange_code(&self, code: String, state: String) -> Result<(String, UserInfo)> {
         // Retrieve and remove the code verifier for this state
-        let code_verifier_secret = self.pkce_sessions.remove(&state)
+        let code_verifier_secret = self
+            .pkce_sessions
+            .remove(&state)
             .ok_or_else(|| anyhow::anyhow!("Invalid state or expired PKCE session"))?
             .1; // DashMap::remove returns Option<(K, V)>, we want the value
-        
+
         let code_verifier = PkceCodeVerifier::new(code_verifier_secret);
-        
+
         let token_response = self
             .client
             .exchange_code(AuthorizationCode::new(code))
