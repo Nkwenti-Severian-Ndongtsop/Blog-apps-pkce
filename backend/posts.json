@@ -1,0 +1,66 @@
+[
+  {
+    "slug": "hello-world",
+    "title": "Hello World",
+    "author": "admin",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "content": "# Hello World\n\nWelcome to our blog! This is our first post.\n\n## Features\n\n- Markdown support\n- HTMX integration\n- Keycloak authentication\n\nStay tuned for more posts!"
+  },
+  {
+    "slug": "another-post",
+    "title": "Another Post",
+    "author": "admin",
+    "created_at": "2024-01-02T00:00:00Z",
+    "updated_at": "2024-01-02T00:00:00Z",
+    "content": "# Another Post\n\nThis is another blog post to demonstrate the system.\n\n## Code Example\n\n```rust\nfn main() {\n    println!(\"Hello, Rust!\");\n}\n```\n\nPretty cool, right?"
+  },
+  {
+    "slug": "quick-test",
+    "title": "Quick Test",
+    "author": "admin",
+    "created_at": "2025-08-07T15:49:42.594438676Z",
+    "updated_at": "2025-08-07T15:49:42.594446040Z",
+    "content": "# Quick\n\nTest post."
+  },
+  {
+    "slug": "my-first-post",
+    "title": "My Updated First Post",
+    "author": "admin",
+    "created_at": "2025-08-07T17:14:03.914977093Z",
+    "updated_at": "2025-08-07T17:14:03.914993342Z",
+    "content": "# My Updated First Post\n\nThis post has been updated via curl!\n\n## New Features\n\n- Updated via API\n- Markdown support\n- Pretty cool!\n\n## Additional Content\n\nThis is new content added to the post."
+  },
+  {
+    "slug": "rust-blog-backend",
+    "title": "Rust Blog Backend",
+    "author": "admin",
+    "created_at": "2025-08-07T16:14:23.328635250Z",
+    "updated_at": "2025-08-07T16:14:23.328641541Z",
+    "content": "# Rust Blog Backend\n\nThis blog is powered by Rust and Axum!\n\n## Tech Stack\n\n- **Backend**: Rust + Axum\n- **Authentication**: Keycloak\n- **Storage**: Markdown files\n- **Frontend**: HTMX (coming soon)\n\n## Code Example\n\n```rust\nfn main() {\n    println!(\"Hello, Blog!\");\n}\n```\n\nPretty awesome, right?"
+  },
+  {
+    "slug": "curl-test-post",
+    "title": "Curl Test Post",
+    "author": "admin",
+    "created_at": "2025-08-07T16:16:16.924177732Z",
+    "updated_at": "2025-08-07T16:16:16.924184245Z",
+    "content": "# Curl Test Post\n\nThis post was created using curl!\n\n## Features\n\n- Created via API\n- Markdown support\n- Pretty cool!"
+  },
+  {
+    "slug": "my-new-blog-post",
+    "title": "My New Blog Post",
+    "author": "placeholder-author",
+    "created_at": "2025-08-11T09:08:32.513320594Z",
+    "updated_at": "2025-08-11T09:08:32.513325770Z",
+    "content": "# This is my new blog post\n\nThis is the content of my blog post in markdown format."
+  },
+  {
+    "slug": "my-first-blog-post",
+    "title": "My first Blog Post",
+    "author": "placeholder-author",
+    "created_at": "2025-08-11T09:14:26.282653862Z",
+    "updated_at": "2025-08-11T09:14:26.282657465Z",
+    "content": "# This is my first blog post\n\nThis is the content of my blog post in markdown format."
+  }
+]
