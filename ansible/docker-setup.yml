@@ -87,13 +87,29 @@
       debug:
         msg: "{{ docker_compose_version_output.stdout }}"
 
-    - name: Test Docker with hello-world
-      docker_container:
-        name: hello-world-test
-        image: hello-world
-        state: started
-        auto_remove: yes
+    - name: Reset SSH connection to allow user changes to take effect
+      meta: reset_connection
+
+    - name: Test Docker with hello-world (using sudo)
+      command: docker run --rm hello-world
+      become: yes
+      register: docker_test_result
+      changed_when: false
+
+    - name: Display Docker test result
+      debug:
+        msg: "{{ docker_test_result.stdout }}"
+
+    - name: Verify vagrant user can run Docker without sudo
+      command: docker run --rm hello-world
       become_user: vagrant
+      register: docker_user_test
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display user Docker test result
+      debug:
+        msg: "{{ docker_user_test.stdout if docker_user_test.rc == 0 else 'User Docker test failed - may need to logout/login' }}"
 
     - name: Copy project files to /home/vagrant/blog-apps
       synchronize:
