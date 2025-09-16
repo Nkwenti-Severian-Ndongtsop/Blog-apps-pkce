@@ -252,16 +252,22 @@ pub async fn callback_handler(
         println!("Assigned 'author' role to user: {}", user_info.sub);
     }
 
-    // Clone the sub field to avoid moving user_info
-    let sub = user_info.sub.clone();
+    // Use the Keycloak access token directly instead of creating our own JWT
+    // This ensures the token has the proper 'kid' header and can be validated against Keycloak's JWKS
+    
+    // Create a cookie with the Keycloak access token (without Secure flag for HTTP development)
+    let cookie = format!(
+        "token={}; HttpOnly; SameSite=Lax; Path=/; Max-Age={}",
+        access_token,
+        24 * 60 * 60 // 24 hours in seconds
+    );
 
-    let claims = Claims { sub, roles };
+    // Create redirect response and set the cookie
+    let mut response = axum::response::Redirect::to("/").into_response();
+    response.headers_mut().insert(
+        axum::http::header::SET_COOKIE,
+        cookie.parse().unwrap(),
+    );
 
-    let token = create_jwt(&claims).map_err(|e| e.to_string())?;
-
-    // Create a redirect response with the token as a URL fragment
-    let redirect_url = format!("/#token={}&access_token={}", token, access_token);
-
-    // Redirect to the frontend with the token
-    Ok(axum::response::Redirect::to(&redirect_url).into_response())
+    Ok(response)
 }

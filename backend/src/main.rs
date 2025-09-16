@@ -8,13 +8,12 @@ use crate::auth::{
 };
 use axum::http::HeaderName;
 use axum::{
-    extract::{Form, Path, Query},
-    http::StatusCode,
-    http::{header, Method},
+    extract::{Form, Path, Query, State},
+    http::{header, HeaderMap, Method, StatusCode},
     middleware,
-    response::{Html, Response},
+    response::{Html, Json, Response},
     routing::{delete, get, post, put},
-    Json, Router,
+    Router,
 };
 use serde_json::json;
 use std::net::SocketAddr;
@@ -96,6 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/protected", get(protected))
         // API routes
         .route("/health", get(health_check))
+        .route("/auth/status", get(auth_status))
         .route("/posts", get(list_posts))
         .route("/posts/:slug", get(get_post))
         .route("/preview", post(preview_markdown))
@@ -132,10 +132,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn health_check() -> Json<serde_json::Value> {
     Json(json!({
-        "status": "ok",
-        "message": "Blog backend is running with Axum and Keycloak auth",
-        "port": "8000"
+        "status": "healthy",
+        "timestamp": chrono::Utc::now().to_rfc3339()
     }))
+}
+
+// Authentication status endpoint
+async fn auth_status(headers: HeaderMap) -> Json<serde_json::Value> {
+    // Try to get token from Authorization header or cookie
+    let token = if let Some(auth_header) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+    {
+        auth::jwt::extract_token_from_header(auth_header)
+            .map(String::from)
+            .ok()
+    } else if let Some(cookie_header) = headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|h| h.to_str().ok())
+    {
+        // Parse cookies to find token
+        let cookies: Vec<&str> = cookie_header.split(';').map(|c| c.trim()).collect();
+        cookies
+            .iter()
+            .find(|c| c.starts_with("token="))
+            .map(|c| c[6..].to_string()) // Remove 'token=' prefix
+    } else {
+        None
+    };
+
+    match token {
+        Some(token) => {
+            // Validate the token
+            match auth::jwt::validate_token(&token).await {
+                Ok(claims) => {
+                    Json(json!({
+                        "authenticated": true,
+                        "user": {
+                            "id": claims.sub,
+                            "roles": claims.roles
+                        }
+                    }))
+                }
+                Err(_) => {
+                    Json(json!({
+                        "authenticated": false,
+                        "error": "Invalid or expired token"
+                    }))
+                }
+            }
+        }
+        None => {
+            Json(json!({
+                "authenticated": false,
+                "error": "No authentication token found"
+            }))
+        }
+    }
 }
 
 async fn list_posts() -> Json<serde_json::Value> {
@@ -258,7 +311,7 @@ struct AdminResponse {
 }
 
 async fn create_post(
-    Json(payload): Json<CreatePostRequest>,
+    Form(payload): Form<CreatePostRequest>,
 ) -> Result<Json<AdminResponse>, StatusCode> {
     // Authentication is handled by middleware; claims should be available in request extensions
     // For now, we'll use a placeholder author - in a real implementation,

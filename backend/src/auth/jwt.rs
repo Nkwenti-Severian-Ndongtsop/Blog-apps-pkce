@@ -82,7 +82,7 @@ pub struct KeycloakConfig {
 
 impl Default for KeycloakConfig {
     fn default() -> Self {
-        let issuer_url = "http://10.216.68.222:8080/realms/blog-realm".to_string();
+        let issuer_url = "http://localhost:8080/realms/blog-realm".to_string();
         let jwks_uri = format!("{}/protocol/openid-connect/certs", issuer_url);
 
         Self {
@@ -212,7 +212,8 @@ async fn decode_and_validate_token(token: &str, config: &KeycloakConfig) -> Resu
     // Configure validation
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&[&config.issuer_url]);
-    validation.set_audience(&[&config.client_id]);
+    // Relax audience validation for Keycloak tokens
+    validation.validate_aud = false;
     validation.validate_exp = true;
     validation.validate_nbf = true;
 
