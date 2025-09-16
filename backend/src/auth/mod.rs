@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub mod jwt;
-pub mod login;
+
 pub mod oauth;
-pub mod test_token;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -26,14 +26,11 @@ pub async fn auth_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
-    println!("Auth middleware called");
-
     // Try to get token from Authorization header first
     let token = if let Some(auth_header) = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
     {
-        println!("Found token in Authorization header");
         jwt::extract_token_from_header(auth_header)
             .map_err(|_| {
                 (
@@ -51,7 +48,6 @@ pub async fn auth_middleware(
         .get(axum::http::header::COOKIE)
         .and_then(|h| h.to_str().ok())
     {
-        println!("Checking for token in cookies");
         // Parse cookies
         let cookies: Vec<&str> = cookie_header.split(';').map(|c| c.trim()).collect();
 
@@ -62,10 +58,7 @@ pub async fn auth_middleware(
             .map(|c| &c[6..]); // Remove 'token=' prefix
 
         match token_cookie {
-            Some(token) => {
-                println!("Found token in cookie");
-                token.to_string()
-            }
+            Some(token) => token.to_string(),
             None => {
                 return Err((
                     StatusCode::UNAUTHORIZED,
@@ -98,11 +91,8 @@ pub async fn auth_middleware(
         )
     })?;
 
-    println!("Token validated successfully. Roles: {:?}", claims.roles);
-
     // Check if user has author role
     if !claims.roles.contains(&"author".to_string()) {
-        println!("User does not have author role");
         return Err((
             StatusCode::FORBIDDEN,
             Json(json!({
@@ -111,8 +101,6 @@ pub async fn auth_middleware(
             })),
         ));
     }
-
-    println!("User has author role, proceeding with request");
 
     // Add claims to request extensions for use in handlers
     let mut request = request;

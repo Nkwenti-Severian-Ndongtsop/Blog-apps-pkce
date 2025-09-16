@@ -1,10 +1,9 @@
 #![allow(warnings)]
 
-use crate::auth::oauth::OAuthConfig;
 use crate::auth::{
-    login::{login, protected},
-    oauth::{callback_handler, login_handler, logout_handler},
-    test_token::generate_test_token,
+    auth_middleware, 
+    jwt::validate_token, 
+    oauth::{callback_handler, login_handler, logout_handler, OAuthConfig},
 };
 use axum::http::HeaderName;
 use axum::{
@@ -89,29 +88,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/login", get(login_handler))
         .route("/auth/callback", get(callback_handler))
         .route("/auth/logout", get(logout_handler))
-        .route("/oauth/callback", get(handle_oauth_callback))
-        .route("/test-token", get(get_test_token))
-        .route("/login", post(login))
-        .route("/protected", get(protected))
+
+
         // API routes
         .route("/health", get(health_check))
         .route("/auth/status", get(auth_status))
         .route("/posts", get(list_posts))
-        .route("/posts/:slug", get(get_post))
+        .route("/posts/{slug}", get(get_post))
         .route("/preview", post(preview_markdown))
         // Admin routes
         .route("/admin/new", get(serve_new_post))
-        .route("/admin/edit/:slug", get(serve_edit_post))
+        .route("/admin/edit/{slug}", get(serve_edit_post))
         // Frontend routes
         .route("/", get(serve_index))
-        .route("/static/:file", get(serve_static))
+        .route("/static/{file}", get(serve_static))
         .route("/posts/html", get(serve_posts_html))
         .nest(
             "/admin",
             Router::new()
                 .route("/new", post(create_post))
-                .route("/edit/:slug", put(edit_post))
-                .route("/delete/:slug", delete(delete_post))
+                .route("/edit/{slug}", put(edit_post))
+                .route("/delete/{slug}", delete(delete_post))
                 .layer(middleware::from_fn(auth::auth_middleware)),
         )
         .layer(cors)
@@ -226,7 +223,7 @@ async fn list_posts() -> Json<serde_json::Value> {
 }
 
 async fn get_post(Path(slug): Path<String>) -> Result<Html<String>, StatusCode> {
-    println!("🔍 Attempting to get post with slug: {}", slug);
+
 
     // Try to get post data first
     match crate::markdown::reader::read_post(&slug) {
@@ -250,7 +247,7 @@ async fn get_post(Path(slug): Path<String>) -> Result<Html<String>, StatusCode> 
                     match crate::markdown::reader::read_and_render_markdown(&slug) {
                         Ok(html_content) => {
                             template = template.replace("{{ content | safe }}", &html_content);
-                            println!("✅ Successfully rendered post: {}", slug);
+
                             Ok(Html(template))
                         }
                         Err(_) => {
@@ -279,7 +276,7 @@ async fn get_post(Path(slug): Path<String>) -> Result<Html<String>, StatusCode> 
             }
         }
         Err(_) => {
-            println!("❌ Failed to find post: {}", slug);
+
             Ok(Html(
                 "<h1>Post not found</h1><p>The requested post could not be found.</p>".to_string(),
             ))
@@ -330,7 +327,7 @@ async fn create_post(
     // Save the post
     match crate::markdown::writer::create_post(&post) {
         Ok(_) => {
-            println!("✅ Post created successfully: {}", slug);
+
             Ok(Json(AdminResponse {
                 success: true,
                 message: "Post created successfully".to_string(),
@@ -338,7 +335,7 @@ async fn create_post(
             }))
         }
         Err(e) => {
-            println!("❌ Failed to create post: {:?}", e);
+
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -372,7 +369,7 @@ async fn edit_post(
     // Update the post
     match crate::markdown::writer::update_post(&post) {
         Ok(_) => {
-            println!("✅ Post updated successfully: {}", slug);
+
             Ok(Json(AdminResponse {
                 success: true,
                 message: "Post updated successfully".to_string(),
@@ -380,7 +377,7 @@ async fn edit_post(
             }))
         }
         Err(e) => {
-            println!("❌ Failed to update post: {:?}", e);
+
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -391,7 +388,7 @@ async fn delete_post(Path(slug): Path<String>) -> Result<Json<AdminResponse>, St
 
     match crate::markdown::writer::delete_post(&slug) {
         Ok(_) => {
-            println!("✅ Post deleted successfully: {}", slug);
+
             Ok(Json(AdminResponse {
                 success: true,
                 message: "Post deleted successfully".to_string(),
@@ -399,7 +396,7 @@ async fn delete_post(Path(slug): Path<String>) -> Result<Json<AdminResponse>, St
             }))
         }
         Err(e) => {
-            println!("❌ Failed to delete post: {:?}", e);
+
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -470,59 +467,9 @@ async fn serve_static(Path(file): Path<String>) -> Result<Response, StatusCode> 
 }
 
 // OAuth callback handler
-async fn handle_oauth_callback(
-    Query(params): Query<std::collections::HashMap<String, String>>,
-) -> Result<Response, StatusCode> {
-    let _ = params.get("code").ok_or(StatusCode::BAD_REQUEST)?;
-    let _ = params.get("state").ok_or(StatusCode::BAD_REQUEST)?;
 
-    // For now, we'll use a test token since we don't have the full OAuth flow implemented
-    // In a real implementation, you would exchange the code for a token with Keycloak
-    let test_token = generate_test_token();
 
-    // Create a simple HTML page that sets the tokens and redirects
-    let html = format!(
-        r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Authentication Success</title>
-</head>
-<body>
-    <script>
-        // Store the tokens
-        localStorage.setItem('auth_token', '{}');
-        localStorage.setItem('id_token', '{}');
-        localStorage.setItem('user_info', JSON.stringify({{
-            sub: 'keycloak-user',
-            roles: ['author']
-        }}));
-        
-        // Redirect back to the main page
-        window.location.href = '/';
-    </script>
-    <p>Authentication successful! Redirecting...</p>
-</body>
-</html>
-        "#,
-        test_token,
-        test_token // Using the same token for simplicity, in a real app this would be the ID token from Keycloak
-    );
 
-    let response = Response::builder()
-        .header("Content-Type", "text/html")
-        .body(axum::body::Body::from(html))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(response)
-}
-
-async fn get_test_token() -> Json<serde_json::Value> {
-    let token = generate_test_token();
-    Json(json!({
-        "token": token
-    }))
-}
 
 // Serve posts as HTML for HTMX
 async fn serve_posts_html() -> Html<String> {

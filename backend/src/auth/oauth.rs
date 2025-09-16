@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
-use crate::auth::jwt::{create_jwt, Claims};
+use crate::auth::jwt::Claims;
 
 #[derive(Debug, Clone)]
 pub struct OAuthConfig {
@@ -206,23 +206,28 @@ pub async fn login_handler(State(oauth_config): State<Arc<OAuthConfig>>) -> impl
 
 // Handler for initiating logout
 pub async fn logout_handler(State(oauth_config): State<Arc<OAuthConfig>>) -> impl IntoResponse {
+    // Build Keycloak logout URL for automatic redirect after logout
+    // Using both redirect_uri and post_logout_redirect_uri for maximum compatibility
     let logout_url = format!(
-        "{}?post_logout_redirect_uri={}",
+        "{}?client_id={}&redirect_uri={}&post_logout_redirect_uri={}",
         oauth_config.logout_url,
-        urlencoding::encode("http://10.216.68.222/")
+        urlencoding::encode("blog-client"),
+        urlencoding::encode("http://localhost/"),
+        urlencoding::encode("http://localhost/")
     );
 
-    // Clear any session cookies
-    let cookie = axum::http::HeaderValue::from_str(
-        "token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax",
+    // Clear the authentication cookie
+    let clear_cookie = axum::http::HeaderValue::from_str(
+        "token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax; Max-Age=0",
     )
     .unwrap();
 
+    // Redirect to Keycloak logout
     let mut response = axum::response::Redirect::temporary(&logout_url).into_response();
 
     response
         .headers_mut()
-        .insert(axum::http::header::SET_COOKIE, cookie);
+        .insert(axum::http::header::SET_COOKIE, clear_cookie);
 
     response
 }
@@ -249,7 +254,6 @@ pub async fn callback_handler(
     // This ensures that all Keycloak users have the author role for our blog
     if !roles.contains(&"author".to_string()) {
         roles.push("author".to_string());
-        println!("Assigned 'author' role to user: {}", user_info.sub);
     }
 
     // Use the Keycloak access token directly instead of creating our own JWT

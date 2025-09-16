@@ -1,8 +1,5 @@
-use crate::auth::test_token;
 use anyhow::{anyhow, Context, Result};
-use jsonwebtoken::{
-    decode, decode_header, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation,
-};
+use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,15 +37,7 @@ pub struct ClientAccess {
     pub roles: Vec<String>,
 }
 
-// Claims for app-signed (HS256) JWTs issued by our backend
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct AppTokenClaims {
-    pub sub: String,
-    pub roles: Vec<String>,
-    // Optional fields to allow decoding tokens without these claims
-    pub exp: Option<usize>,
-    pub iat: Option<usize>,
-}
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Jwks {
@@ -94,17 +83,7 @@ impl Default for KeycloakConfig {
     }
 }
 
-/// Validate JWT token from Keycloak
-/// Create a new JWT token with the given claims
-pub fn create_jwt(claims: &Claims) -> Result<String> {
-    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-256-bit-secret".to_string());
-    let encoding_key = EncodingKey::from_secret(secret.as_bytes());
 
-    let token =
-        encode(&Header::default(), &claims, &encoding_key).context("Failed to create JWT token")?;
-
-    Ok(token)
-}
 
 // Ensure every authenticated user has the "author" role
 fn normalize_roles(mut roles: Vec<String>) -> Vec<String> {
@@ -114,69 +93,16 @@ fn normalize_roles(mut roles: Vec<String>) -> Vec<String> {
     roles
 }
 
-// Validate app-signed HS256 JWT issued by our backend
-fn validate_app_token(token: &str) -> Result<AppTokenClaims> {
-    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-256-bit-secret".to_string());
-    let decoding_key = DecodingKey::from_secret(secret.as_bytes());
 
-    let mut validation = Validation::new(Algorithm::HS256);
-    // Our app tokens may not include exp/iat in dev; don't enforce exp
-    validation.validate_exp = false;
-
-    let token_data = decode::<AppTokenClaims>(token, &decoding_key, &validation)
-        .context("Failed to decode app-signed token")?;
-
-    Ok(token_data.claims)
-}
 
 pub async fn validate_token(token: &str) -> Result<Claims> {
     // Remove "Bearer " prefix if present
     let token = token.trim_start_matches("Bearer ").trim();
 
-    println!("Validating token: {}...", &token[..10.min(token.len())]);
-
-    // For local development, try test token first
-    match test_token::validate_test_token(token) {
-        Ok(test_claims) => {
-            println!("Validated as test token for user: {}", test_claims.sub);
-            return Ok(Claims {
-                sub: test_claims.sub,
-                roles: normalize_roles(test_claims.roles),
-            });
-        }
-        Err(e) => {
-            println!("Not a test token: {}", e);
-        }
-    }
-
-    // Try app-signed HS256 token (issued by our OAuth callback)
-    match validate_app_token(token) {
-        Ok(app_claims) => {
-            println!("Validated as app token for user: {}", app_claims.sub);
-            return Ok(Claims {
-                sub: app_claims.sub,
-                roles: normalize_roles(app_claims.roles),
-            });
-        }
-        Err(e) => {
-            println!("Not an app-signed token: {}", e);
-        }
-    }
-
-    // If we get here, try to validate as a Keycloak token
+    // Validate as Keycloak token
     let config = KeycloakConfig::default();
-    println!("Attempting to validate as Keycloak token");
-
-    match decode_and_validate_token(token, &config).await {
-        Ok(claims) => {
-            println!("Validated as Keycloak token for user: {}", claims.sub);
-            Ok(claims)
-        }
-        Err(e) => {
-            println!("Token validation failed: {}", e);
-            Err(anyhow!("Invalid or expired token: {}", e))
-        }
-    }
+    decode_and_validate_token(token, &config).await
+        .map_err(|e| anyhow!("Invalid or expired token: {}", e))
 }
 
 /// Decode and validate Keycloak JWT token

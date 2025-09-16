@@ -91,45 +91,35 @@
         }
 
         function logout() {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_info');
+            // Clear frontend authentication state
+            clearAuth();
             
-            currentUser = null;
-            authToken = null;
-            updateAuthUI();
-            
-            // Redirect to Keycloak logout through nginx
-            const keycloakUrl = '/auth/realms/blog-realm/protocol/openid-connect/logout';
-            const clientId = 'blog-client';
-            const redirectUri = encodeURIComponent(window.location.origin);
-            
-            const logoutUrl = `${keycloakUrl}?client_id=${clientId}&redirect_uri=${redirectUri}`;
-            window.location.href = logoutUrl;
+            // Use the backend logout handler which will properly clear cookies and redirect to Keycloak
+            window.location.href = '/auth/logout';
         }
 
         // Check authentication status
         async function checkAuthStatus() {
-            const token = localStorage.getItem('auth_token');
-            const userInfo = localStorage.getItem('user_info');
-            
-            if (token && userInfo) {
-                try {
-                    currentUser = JSON.parse(userInfo);
-                    authToken = token;
-                    updateAuthUI();
-                } catch (error) {
-                    console.error('Error parsing user info:', error);
-                    clearAuth();
-                }
-            } else {
-                const urlParams = new URLSearchParams(window.location.search);
-                const code = urlParams.get('code');
-                const state = urlParams.get('state');
+            try {
+                const response = await fetch('/auth/status', {
+                    method: 'GET',
+                    credentials: 'include' // Include cookies
+                });
                 
-                if (code && state) {
-                    await handleAuthCallback(code, state);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.authenticated) {
+                        currentUser = { sub: data.user_id, roles: data.roles };
+                        updateAuthUI();
+                        return;
+                    }
                 }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
             }
+            
+            // If not authenticated, clear any old state
+            clearAuth();
         }
 
         // Handle authentication callback
@@ -188,8 +178,6 @@
 
         // Clear authentication
         function clearAuth() {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_info');
             currentUser = null;
             authToken = null;
             updateAuthUI();
@@ -228,6 +216,11 @@
                 alert('Error deleting post. Please try again.');
             }
         }
+
+        // Initialize authentication status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+        });
     </script>
 </body>
 </html>
