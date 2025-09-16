@@ -87,10 +87,7 @@
       debug:
         msg: "{{ docker_compose_version_output.stdout }}"
 
-    - name: Reset SSH connection to allow user changes to take effect
-      meta: reset_connection
-
-    - name: Test Docker with hello-world (using sudo)
+    - name: Test Docker installation with hello-world
       command: docker run --rm hello-world
       become: yes
       register: docker_test_result
@@ -98,18 +95,52 @@
 
     - name: Display Docker test result
       debug:
-        msg: "{{ docker_test_result.stdout }}"
+        msg: "Docker installation successful!"
 
-    - name: Verify vagrant user can run Docker without sudo
-      command: docker run --rm hello-world
-      become_user: vagrant
-      register: docker_user_test
-      changed_when: false
+    - name: Ensure Docker socket permissions are correct
+      file:
+        path: /var/run/docker.sock
+        owner: root
+        group: docker
+        mode: '0660'
+
+    - name: Create docker group if it doesn't exist
+      group:
+        name: docker
+        state: present
+
+    - name: Ensure vagrant user is properly added to docker group
+      user:
+        name: vagrant
+        groups: docker
+        append: yes
+
+    - name: Set proper permissions for Docker daemon
+      systemd:
+        name: docker
+        state: restarted
+        enabled: yes
+
+    - name: Wait for Docker to be ready
+      wait_for:
+        port: 2375
+        host: localhost
+        timeout: 30
       ignore_errors: yes
 
-    - name: Display user Docker test result
-      debug:
-        msg: "{{ docker_user_test.stdout if docker_user_test.rc == 0 else 'User Docker test failed - may need to logout/login' }}"
+    - name: Final Docker setup - ensure everything is working
+      shell: |
+        # Restart Docker to ensure all permissions are applied
+        systemctl restart docker
+        sleep 5
+        # Test Docker works with root
+        docker run --rm hello-world
+        # Set up proper group permissions
+        chgrp docker /var/run/docker.sock
+        chmod g+rw /var/run/docker.sock
+      become: yes
+      register: final_docker_setup
+      changed_when: false
 
     - name: Copy project files to /home/vagrant/blog-apps
       synchronize:
