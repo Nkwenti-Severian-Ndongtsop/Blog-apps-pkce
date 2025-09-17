@@ -37,81 +37,82 @@
 
 #### Step-by-Step Flow
 
-1. **User initiates login**
+1. **User clicks Login button in browser**
 
-   - Browser app redirects to Keycloak's `/auth` endpoint with:
+   **Frontend (Browser JavaScript):**
+   - Redirects browser to backend endpoint: `GET /auth/login`
+
+   **Backend (Rust Server):**
+   - Receives the login request
+   - Generates random 128-character code verifier (alphanumeric)
+   - Creates SHA256 hash of code verifier as code challenge
+   - Stores code verifier mapped to state in DashMap (in-memory)
+   - Builds Keycloak authorization URL with:
      - `response_type=code`
      - `client_id=blog-client`
      - `redirect_uri=http://localhost/auth/callback`
-     - `code_challenge` (SHA256 hash of a random string)
+     - `code_challenge` (SHA256 hash of code verifier)
      - `code_challenge_method=S256`
+     - `scope=openid profile email`
+   - Redirects browser to Keycloak authorization URL
 
-2. **Keycloak authenticates user**
+2. **Keycloak handles authentication**
 
+   **Keycloak:**
+   - Displays login form to user
    - User enters credentials
-   - Keycloak validates and redirects to `redirect_uri` with `code`
+   - Keycloak validates credentials and user session
+   - Keycloak redirects browser back to backend with:
+     - `code` (authorization code)
+   - Redirect goes to: `GET /auth/callback?code=...&state=...`
 
-3. **App exchanges code for tokens**
+3. **Backend exchanges code for tokens**
 
-   - App sends POST request to Keycloak `/token` endpoint with:
-     - `code` (from previous step)
-     - `code_verifier` (original random string)
-     - `client_id`
-     - `redirect_uri`
-   - Keycloak verifies `code_verifier` matches `code_challenge`
+   **Backend (Rust Server):**
+   - Receives callback: `GET /auth/callback?code=...&state=...`
+   - Retrieves stored `code_verifier` from DashMap using the `state`
+   - Removes code verifier from DashMap (one-time use)
+   - Sends POST request to Keycloak `/token` endpoint with:
+     - `grant_type=authorization_code`
+     - `code` (authorization code from step 2)
+     - `code_verifier` (original 128-character random string)
+     - `client_id=blog-client`
+     - `redirect_uri=http://localhost/auth/callback`
+   
+   **Keycloak:**
+   - Verifies `code_verifier` SHA256 hash matches stored `code_challenge`
+   - Validates authorization code hasn't been used before
 
-4. **Keycloak returns tokens**
+4. **Keycloak returns tokens to backend**
 
-   - Access token, ID token, and optionally refresh token
+   **Keycloak:**
+   - Responds with JSON containing:
+     - `access_token` (JWT with user claims and roles)
+     - `id_token` (OpenID Connect identity token)
+     - `refresh_token` (for token renewal)
+     - `token_type=Bearer`
+     - `expires_in` (token lifetime in seconds)
 
-5. **App uses tokens for API requests**
-   - Tokens sent in Authorization header to backend
+5. **Frontend (Browser):**
+   - Receives redirect to home page
+   - Cookie is automatically stored by browser
+   - Calls `GET /auth/status` to check authentication
+   - Updates UI to show logout button and admin features
+   - For subsequent API requests, authentication works via:
+   - HttpOnly cookie (automatically included by browser) 
 
-#### Keycloak Configuration in This Project
 
-- **Client Type:** OpenID Connect
-- **PKCE Method:** S256
-- **Client Authentication:** OFF (public client)
-- **Standard Flow:** ON (Authorization Code Flow)
-- **Redirect URI:** `http://localhost/auth/callback`
+PKCE Flow:
+1. Browser → Backend: User clicks login
+2. Backend → Keycloak: Auth request + code_challenge
+3. Keycloak → Browser: Login form, then redirect with authorization code
+4. Browser → Backend: Authorization code via callback
+5. Backend → Keycloak: Code + code_verifier → Tokens
+6. Backend → Browser: Set secure cookie + redirect to home
 
-#### Rust Backend Integration
-
-```rust
-// filepath: src/main.rs
-let oauth_config = OAuthConfig::new(
-    "blog-client".to_string(),
-    "".to_string(), // No client secret for PKCE
-    "http://localhost/auth/callback".to_string(),
-    "http://localhost:8080/realms/blog-realm/protocol/openid-connect/auth".to_string(),
-    "http://localhost:8080/realms/blog-realm/protocol/openid-connect/token".to_string(),
-    "http://localhost:8080/realms/blog-realm/protocol/openid-connect/userinfo".to_string(),
-    "http://localhost:8080/realms/blog-realm/protocol/openid-connect/logout".to_string(),
-)?;
-```
-
-- **Backend validates tokens from Keycloak**
-- **Role-based access enforced (e.g., 'author' role)**
-
----
-
-## Why PKCE Is Better
-
-- **Prevents code interception attacks**
-- **No client secret needed (safe for SPAs and mobile apps)**
-- **Tokens never exposed in browser URL**
-- **Refresh tokens supported**
-
----
-
-## Visual Comparison
-
-```
-┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│   Browser   │◄───►│   Keycloak  │◄───►│   Backend   │
-└─────────────┘      └─────────────┘      └─────────────┘
-      ▲ PKCE: Secure code exchange, tokens via backend
-      ▼ Implicit: Tokens in browser URL (not recommended)
+Implicit Flow (Legacy):
+1. Browser → Keycloak: Auth request
+2. Keycloak → Browser: Tokens in URL (vulnerable)
 ```
 
 ---
