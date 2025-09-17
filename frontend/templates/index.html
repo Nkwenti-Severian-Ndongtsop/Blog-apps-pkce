@@ -385,20 +385,30 @@
             }
         }
 
-        // HTMX event handlers
+        // HTMX event handlers - only handle form submissions that expect JSON
         document.addEventListener('htmx:afterRequest', function(event) {
-            if (event.detail.xhr.status === 200) {
-                const response = JSON.parse(event.detail.xhr.responseText);
-                if (response.success) {
-                    // Refresh the posts list
-                    htmx.trigger('#posts-container', 'load');
-                    closeModal('new-post-modal');
-                    alert('Post created successfully!');
+            // Only handle requests to admin endpoints (which return JSON)
+            const url = event.detail.pathInfo.requestPath;
+            if (url && url.startsWith('/admin/')) {
+                if (event.detail.xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(event.detail.xhr.responseText);
+                        if (response.success) {
+                            // Refresh the posts list
+                            htmx.trigger('#posts-container', 'load');
+                            closeModal('new-post-modal');
+                            alert('Post created successfully!');
+                        } else {
+                            alert('Error creating post: ' + response.message);
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse JSON response:', e);
+                        console.log('Response text:', event.detail.xhr.responseText);
+                        alert('Error creating post. Invalid response format.');
+                    }
                 } else {
-                    alert('Error creating post: ' + response.message);
+                    alert('Error creating post. Please try again.');
                 }
-            } else {
-                alert('Error creating post. Please try again.');
             }
         });
 
@@ -409,7 +419,16 @@
 
         // Configure HTMX to include credentials (cookies) in all requests
         document.body.addEventListener('htmx:configRequest', function(event) {
-            event.detail.xhr.withCredentials = true;
+            if (event.detail.xhr) {
+                event.detail.xhr.withCredentials = true;
+            }
+        });
+        
+        // Alternative HTMX configuration for newer versions
+        document.body.addEventListener('htmx:beforeRequest', function(event) {
+            if (event.detail.xhr) {
+                event.detail.xhr.withCredentials = true;
+            }
         });
     </script>
 </body>

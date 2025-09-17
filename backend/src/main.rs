@@ -102,6 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Frontend routes
         .route("/", get(serve_index))
         .route("/static/{file}", get(serve_static))
+        .route("/favicon.ico", get(serve_favicon))
         .route("/posts/html", get(serve_posts_html))
         .nest(
             "/admin",
@@ -473,7 +474,11 @@ async fn serve_static(Path(file): Path<String>) -> Result<Response, StatusCode> 
 
 // Serve posts as HTML for HTMX
 async fn serve_posts_html() -> Html<String> {
-    match std::fs::read_to_string("posts.json") {
+    // Use absolute path to posts.json
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let posts_path = current_dir.join("posts.json");
+    
+    match std::fs::read_to_string(posts_path) {
         Ok(content) => match serde_json::from_str::<Vec<crate::markdown::Post>>(&content) {
             Ok(posts) => {
                 let mut html = String::new();
@@ -512,4 +517,15 @@ async fn serve_posts_html() -> Html<String> {
         },
         Err(_) => Html("<p class='no-posts'>Error loading posts.</p>".to_string()),
     }
+}
+
+// Serve favicon
+async fn serve_favicon() -> Result<Response, StatusCode> {
+    // Create a simple favicon response or return 204 No Content
+    let response = Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(axum::body::Body::empty())
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    
+    Ok(response)
 }
