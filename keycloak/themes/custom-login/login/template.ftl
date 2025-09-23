@@ -322,6 +322,93 @@
             margin-bottom: 20px;
         }
         
+        /* Logout page specific styles */
+        .logout-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+        
+        .logout-btn:hover {
+            background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.3);
+        }
+        
+        .cancel-btn {
+            display: block;
+            text-align: center;
+            padding: 12px 24px;
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            color: #6b7280;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .cancel-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        
+        /* Error page specific styles */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #dc2626;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        /* Info page specific styles */
+        .info-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .info-header h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .info-message {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #1d4ed8;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .required-actions {
+            margin: 20px 0;
+        }
+        
+        .required-action-item {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            color: #92400e;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
         /* Error messages */
         .alert-error {
             background-color: #f8d7da;
