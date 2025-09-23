@@ -1,3 +1,0 @@
-# Quick
-
-Test post.

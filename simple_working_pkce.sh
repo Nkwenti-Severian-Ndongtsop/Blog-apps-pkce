@@ -33,8 +33,15 @@ AUTH_URL=$(echo "$AUTH_RESPONSE" | grep -i "location:" | cut -d' ' -f2- | tr -d 
 BACKEND_CHALLENGE=$(echo "$AUTH_URL" | grep -o 'code_challenge=[^&]*' | cut -d'=' -f2)
 BACKEND_STATE=$(echo "$AUTH_URL" | grep -o 'state=[^&]*' | cut -d'=' -f2)
 
+# Generate example code verifier to show the process
+EXAMPLE_VERIFIER=$(openssl rand -base64 96 | tr -d "=+/" | cut -c1-128)
+EXAMPLE_CHALLENGE=$(echo -n "$EXAMPLE_VERIFIER" | openssl dgst -sha256 -binary | openssl base64 | tr -d "=+/" | tr "/+" "_-")
+
 echo "🔐 PKCE Challenge: $BACKEND_CHALLENGE"
+echo "🔑 Example Code Verifier: $EXAMPLE_VERIFIER"
+echo "🔍 Example Challenge (SHA256): $EXAMPLE_CHALLENGE"
 echo "🎫 State: $BACKEND_STATE"
+echo "ℹ️  Note: Backend uses its own verifier (not shown) that matches the challenge above"
 echo
 
 # Step 2: Get login form
